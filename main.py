@@ -1,282 +1,156 @@
-import pyrogram
-from pyrogram import Client, filters
-from pyrogram.errors import UserAlreadyParticipant, InviteHashExpired, UsernameNotOccupied
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, filters, CallbackQueryHandler, MessageHandler
+from random import choice
+import logging
 
-import time
-import os
-import threading
-import json
+CHANNEL_USERNAME = '@ethical_botz'  # Replace with your channel's username
+CHANNEL_LINK = 'https://t.me/Ethical_Botz'  # Replace with your channel's invite link
 
-with open('config.json', 'r') as f: DATA = json.load(f)
-def getenv(var): return os.environ.get(var) or DATA.get(var, None)
+can_show = False
+admins = ['DebyO2']
 
-bot_token = getenv("TOKEN") 
-api_hash = getenv("HASH") 
-api_id = getenv("ID")
-bot = Client("mybot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-ss = getenv("STRING")
-if ss is not None:
-	acc = Client("myacc" ,api_id=api_id, api_hash=api_hash, session_string=ss)
-	acc.start()
-else: acc = None
+user_chat_ids = set()
 
-# download status
-def downstatus(statusfile,message):
-	while True:
-		if os.path.exists(statusfile):
-			break
+def Random_choice():
+    option = ['BIG','SMALL']
+    return choice(option)
 
-	time.sleep(3)      
-	while os.path.exists(statusfile):
-		with open(statusfile,"r") as downread:
-			txt = downread.read()
-		try:
-			bot.edit_message_text(message.chat.id, message.id, f"__Downloaded__ : **{txt}**")
-			time.sleep(10)
-		except:
-			time.sleep(5)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # chat_id = update.message.chat_id
+    chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat_id
+    user_id = update.effective_user.id
+    chat_member = await context.bot.get_chat_member(CHANNEL_USERNAME, user_id)
+    
+    image_path = 'static/banner.jpeg'
 
+    with open(image_path, 'rb') as image_file:
+        if chat_member.status in ['left', 'kicked']:
+            keyboard = [InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)]
+            joined_status_no = [InlineKeyboardButton("Channel joined 🔴", callback_data="inactive")]
+            # [[inactive_button1], [inactive_button2]]
+            reply_markup = InlineKeyboardMarkup([keyboard ,joined_status_no])
+            # await update.message.reply_text('Please join the channel to use this bot.', reply_markup=reply_markup)
+            await context.bot.send_photo(chat_id=chat_id, photo=image_file, caption='Please join the channel to use this bot.',reply_markup=reply_markup)
+        else:
 
-# upload status
-def upstatus(statusfile,message):
-	while True:
-		if os.path.exists(statusfile):
-			break
+            user_chat_ids.add(chat_id)
 
-	time.sleep(3)      
-	while os.path.exists(statusfile):
-		with open(statusfile,"r") as upread:
-			txt = upread.read()
-		try:
-			bot.edit_message_text(message.chat.id, message.id, f"__Uploaded__ : **{txt}**")
-			time.sleep(10)
-		except:
-			time.sleep(5)
+            joined_status_yes = [[InlineKeyboardButton("Channel joined 🟢", callback_data="inactive")]]
+
+            reply_markup2 = InlineKeyboardMarkup(joined_status_yes)
+
+            prediction_button = [[KeyboardButton(text="🎰Colour Prediction")]]
+            prediction_markup = ReplyKeyboardMarkup(prediction_button,resize_keyboard=True,one_time_keyboard=True)
+            # await update.message.reply_text('Hello! You are a member of the channel. You can use the bot commands.')
+            await context.bot.send_photo(chat_id=chat_id, photo=image_file, caption='Hello! You are a member of the channel. You can use the bot commands.',reply_markup=reply_markup2)
+            
+            await context.bot.send_message(chat_id=chat_id, text="play the games",reply_markup=prediction_markup)
+            # await update.message.reply_text('play the games',reply_markup=prediction_markup)
+
+    # with open(image_path, 'rb') as image_file:
+    #     await context.bot.send_photo(chat_id=chat_id, photo=image_file)
 
 
-# progress writter
-def progress(current, total, message, type):
-	with open(f'{message.id}{type}status.txt',"w") as fileup:
-		fileup.write(f"{current * 100 / total:.1f}%")
+
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    # Check if the "inactive" button was clicked
+    if query.data == "inactive":
+        # Optionally, send a notification to the user that this button is inactive
+        # await query.answer(text="This button is inactive.", show_alert=True)
+        # chat_id = update.message.chat_id
+        await start(update, context)
+
+async def choose(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat_id
+    user_id = update.effective_user.id
+    chat_member = await context.bot.get_chat_member(CHANNEL_USERNAME, user_id)
+    if not (chat_member.status in ['left', 'kicked']):
+        print("yea");
+        tiranga = [KeyboardButton(text="⚀ Tiranga Games")]
+        lottery = [KeyboardButton(text="⛾ 82lottery")]
+        choose_markup = ReplyKeyboardMarkup([tiranga,lottery],resize_keyboard=True,one_time_keyboard=True)
+        await context.bot.send_message(chat_id=chat_id, text="choose",reply_markup=choose_markup)
+    else:
+        pass
+
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat_id
+    user_id = update.effective_user.id
+    user_name = update.message.from_user.username
+    chat_member = await context.bot.get_chat_member(CHANNEL_USERNAME, user_id)
+
+    # if user_name in admins:
+    #     print("it works")
+    # else:
+    #     print("chiken")
+    #     print(user_name)
+
+    if not (chat_member.status in ['left', 'kicked']) and context.args and (user_name in admins): #and (user_name in admins) and context.args:
+        message = ' '.join(context.args)
+        for chat_id in user_chat_ids:
+            try:
+                await context.bot.send_message(chat_id=chat_id, text=message)
+            except Exception as e:
+                logging.error(f"Error sending message to {chat_id}: {e}")
+    else:
+
+        await context.bot.send_message(chat_id=chat_id, text="error")
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = update.message.text
+    global can_show
+    # Custom logic based on the text of the button pressed
+    if text == "🎰Colour Prediction":
+        await update.message.reply_text("you will be given to choose",reply_markup=ReplyKeyboardRemove())
+        await choose(update, context)
+
+    elif text == "fuck you":
+        await update.message.reply_text("no, fuck you")
+    
+    elif text == "⚀ Tiranga Games" or text == "⛾ 82lottery" or text == "⚡ Next Prediction ⚡":
+
+        await update.message.reply_text("Enter Period last 3 digits",reply_markup=ReplyKeyboardRemove())
+        text = update.message.text
+        can_show = True
+
+    elif text.isdigit() and len(text)== 3 and can_show:
+        result = Random_choice()
+        next_prediction = [KeyboardButton(text="⚡ Next Prediction ⚡")]
+
+        back_press = [KeyboardButton(text="🔙 back")]
+
+        next_markup = ReplyKeyboardMarkup([next_prediction,back_press],resize_keyboard=True,one_time_keyboard=True)
 
 
-# start command
-@bot.on_message(filters.command(["start"]))
-def send_start(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
-	bot.send_message(message.chat.id, f"**__👋 Hi** **{message.from_user.mention}**, **I am Save Restricted Bot, I can send you restricted content by it's post link__**\n\n{USAGE}",
-	reply_markup=InlineKeyboardMarkup([[ InlineKeyboardButton("🌐 Update Channel", url="https://t.me/Ethical_Botz")]]), reply_to_message_id=message.id)
+        pred = f"✅Prediction Result:\n👨‍💻Period No: {text}\n⚡Colour: {result}"
 
+        can_show = False
 
-@bot.on_message(filters.text)
-def save(client: pyrogram.client.Client, message: pyrogram.types.messages_and_media.message.Message):
-	print(message.text)
+        await update.message.reply_text(text=pred,reply_markup=next_markup)
+    
+    elif text == "🔙 back" and can_show:
+        can_show = False;
+        await update.message.reply_text("you will be given to choose",reply_markup=ReplyKeyboardRemove())
+        
 
-	# joining chats
-	if "https://t.me/+" in message.text or "https://t.me/joinchat/" in message.text:
+    elif text == "🔙 back" and not can_show:
+        await choose(update, context)
 
-		if acc is None:
-			bot.send_message(message.chat.id,f"**String Session is not Set**", reply_to_message_id=message.id)
-			return
+    else:
+        await update.message.reply_text("Unrecognized option")
+    
+    print(can_show)
+    
+application = ApplicationBuilder().token("7124793969:AAFCOJ9Ij4EEnWY68rPE2Lkvm15Bnu5uED0").build()
 
-		try:
-			try: acc.join_chat(message.text)
-			except Exception as e: 
-				bot.send_message(message.chat.id,f"**Error** : __{e}__", reply_to_message_id=message.id)
-				return
-			bot.send_message(message.chat.id,"**Chat Joined**", reply_to_message_id=message.id)
-		except UserAlreadyParticipant:
-			bot.send_message(message.chat.id,"**Chat alredy Joined**", reply_to_message_id=message.id)
-		except InviteHashExpired:
-			bot.send_message(message.chat.id,"**Invalid Link**", reply_to_message_id=message.id)
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("broadcast", broadcast))
+application.add_handler(CallbackQueryHandler(button_callback))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,handle_message))
 
-	# getting message
-	elif "https://t.me/" in message.text:
-
-		datas = message.text.split("/")
-		temp = datas[-1].replace("?single","").split("-")
-		fromID = int(temp[0].strip())
-		try: toID = int(temp[1].strip())
-		except: toID = fromID
-
-		for msgid in range(fromID, toID+1):
-
-			# private
-			if "https://t.me/c/" in message.text:
-				chatid = int("-100" + datas[4])
-				
-				if acc is None:
-					bot.send_message(message.chat.id,f"**String Session is not Set**", reply_to_message_id=message.id)
-					return
-				
-				handle_private(message,chatid,msgid)
-				# try: handle_private(message,chatid,msgid)
-				# except Exception as e: bot.send_message(message.chat.id,f"**Error** : __{e}__", reply_to_message_id=message.id)
-			
-			# bot
-			elif "https://t.me/b/" in message.text:
-				username = datas[4]
-				
-				if acc is None:
-					bot.send_message(message.chat.id,f"**String Session is not Set**", reply_to_message_id=message.id)
-					return
-				try: handle_private(message,username,msgid)
-				except Exception as e: bot.send_message(message.chat.id,f"**Error** : __{e}__", reply_to_message_id=message.id)
-
-			# public
-			else:
-				username = datas[3]
-
-				try: msg  = bot.get_messages(username,msgid)
-				except UsernameNotOccupied: 
-					bot.send_message(message.chat.id,f"**The username is not occupied by anyone**", reply_to_message_id=message.id)
-					return
-
-				try: bot.copy_message(message.chat.id, msg.chat.id, msg.id,reply_to_message_id=message.id)
-				except:
-					if acc is None:
-						bot.send_message(message.chat.id,f"**String Session is not Set**", reply_to_message_id=message.id)
-						return
-					try: handle_private(message,username,msgid)
-					except Exception as e: bot.send_message(message.chat.id,f"**Error** : __{e}__", reply_to_message_id=message.id)
-
-			# wait time
-			time.sleep(3)
-
-
-# handle private
-def handle_private(message: pyrogram.types.messages_and_media.message.Message, chatid: int, msgid: int):
-		msg: pyrogram.types.messages_and_media.message.Message = acc.get_messages(chatid,msgid)
-		msg_type = get_message_type(msg)
-
-		if "Text" == msg_type:
-			bot.send_message(message.chat.id, msg.text, entities=msg.entities, reply_to_message_id=message.id)
-			return
-
-		smsg = bot.send_message(message.chat.id, '__Downloading__', reply_to_message_id=message.id)
-		dosta = threading.Thread(target=lambda:downstatus(f'{message.id}downstatus.txt',smsg),daemon=True)
-		dosta.start()
-		file = acc.download_media(msg, progress=progress, progress_args=[message,"down"])
-		os.remove(f'{message.id}downstatus.txt')
-
-		upsta = threading.Thread(target=lambda:upstatus(f'{message.id}upstatus.txt',smsg),daemon=True)
-		upsta.start()
+application.run_polling()
 		
-		if "Document" == msg_type:
-			try:
-				thumb = acc.download_media(msg.document.thumbs[0].file_id)
-			except: thumb = None
-			
-			bot.send_document(message.chat.id, file, thumb=thumb, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])
-			if thumb != None: os.remove(thumb)
-
-		elif "Video" == msg_type:
-			try: 
-				thumb = acc.download_media(msg.video.thumbs[0].file_id)
-			except: thumb = None
-
-			bot.send_video(message.chat.id, file, duration=msg.video.duration, width=msg.video.width, height=msg.video.height, thumb=thumb, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])
-			if thumb != None: os.remove(thumb)
-
-		elif "Animation" == msg_type:
-			bot.send_animation(message.chat.id, file, reply_to_message_id=message.id)
-			   
-		elif "Sticker" == msg_type:
-			bot.send_sticker(message.chat.id, file, reply_to_message_id=message.id)
-
-		elif "Voice" == msg_type:
-			bot.send_voice(message.chat.id, file, caption=msg.caption, thumb=thumb, caption_entities=msg.caption_entities, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])
-
-		elif "Audio" == msg_type:
-			try:
-				thumb = acc.download_media(msg.audio.thumbs[0].file_id)
-			except: thumb = None
-				
-			bot.send_audio(message.chat.id, file, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=message.id, progress=progress, progress_args=[message,"up"])   
-			if thumb != None: os.remove(thumb)
-
-		elif "Photo" == msg_type:
-			bot.send_photo(message.chat.id, file, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=message.id)
-
-		os.remove(file)
-		if os.path.exists(f'{message.id}upstatus.txt'): os.remove(f'{message.id}upstatus.txt')
-		bot.delete_messages(message.chat.id,[smsg.id])
-
-
-# get the type of message
-def get_message_type(msg: pyrogram.types.messages_and_media.message.Message):
-	try:
-		msg.document.file_id
-		return "Document"
-	except: pass
-
-	try:
-		msg.video.file_id
-		return "Video"
-	except: pass
-
-	try:
-		msg.animation.file_id
-		return "Animation"
-	except: pass
-
-	try:
-		msg.sticker.file_id
-		return "Sticker"
-	except: pass
-
-	try:
-		msg.voice.file_id
-		return "Voice"
-	except: pass
-
-	try:
-		msg.audio.file_id
-		return "Audio"
-	except: pass
-
-	try:
-		msg.photo.file_id
-		return "Photo"
-	except: pass
-
-	try:
-		msg.text
-		return "Text"
-	except: pass
-
-
-USAGE = """**FOR PUBLIC CHATS**
-
-**__just send post/s link__**
-
-**FOR PRIVATE CHATS**
-
-**__first send invite link of the chat (unnecessary if the account of string session already member of the chat)
-then send post/s link__**
-
-**FOR BOT CHATS**
-
-**__send link with** '/b/', **bot's username and message id, you might want to install some unofficial client to get the id like below__**
-
-```
-https://t.me/b/botusername/4321
-```
-
-**MULTI POSTS**
-
-**__send public/private posts link as explained above with formate "from - to" to send multiple messages like below__**
-
-```
-https://t.me/xxxx/1001-1010
-
-https://t.me/c/xxxx/101 - 120
-```
-
-**__note that space in between doesn't matter__**
-"""
-
-
-# infinty polling
-bot.run()
